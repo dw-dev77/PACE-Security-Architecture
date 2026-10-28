@@ -4,7 +4,7 @@
 
 > **Status:** Architecture concept / personal implementation  
 > **Scope:** Personal OPSEC, credential resilience, and recovery planning  
-> **Version:** 2.0
+> **Version:** 2.1
 
 ## Overview
 
@@ -21,28 +21,56 @@ These tiers are not intended to form a single, strictly linear chain. They are f
 
 The central design goal is **graceful degradation**: the loss of one component should not automatically cause the loss of the wider recovery environment.
 
+### PACE roles and architectural tiers
+
+PACE describes recovery roles; the four tiers describe functional security domains. They are related, but they are not interchangeable.
+
+* **Primary:** The normal, intended route for accessing a resource or performing an operation.
+* **Alternate:** A separate route available when the primary route is unavailable.
+* **Contingency:** A recovery capability used when normal and alternate operations cannot continue.
+* **Emergency:** A last-resort capability intended to preserve or restore essential access under severe disruption.
+
+The four tiers organize credentials, identity controls, encrypted recovery resources, and physical recovery material. A tier may support more than one PACE role, depending on the resource and failure scenario.
+
+PACE roles should be assigned to specific recovery scenarios rather than permanently equated with individual tiers. A recovery path qualifies as alternate or independent only to the extent that it avoids the relevant failed dependencies.
+
+The labels describe design intent; their effectiveness depends on implementation and testing.
+
 ## Architecture at a glance
 
 The graph below shows the conceptual relationships between tiers. Arrows represent potential recovery or support paths, not a guarantee that every path works for every service. Actual dependencies depend on the implementation and the recovery options supported by each provider.
 
 ```mermaid
-flowchart TD
-    T1["Tier 1: Daily Operations"]
-    T2["Tier 2: Master Identity"]
-    T3["Tier 3: Encrypted Recovery"]
-    T4A["Tier 4A: Primary Physical Cache"]
-    T4B["Tier 4B: Remote Physical Cache"]
+flowchart TB
+    subgraph OPS["Tier 1 — Daily Operations"]
+        T1["Routine credentials<br/>Everyday access"]
+    end
 
-    T1 <--> T2
-    T2 <--> T3
-    T3 <--> T4A
-    T3 <--> T4B
-    T4A <--> T4B
-    T4A -. "alternate recovery path" .-> T2
-    T4B -. "alternate recovery path" .-> T2
+    subgraph ID["Tier 2 — Master Identity"]
+        T2["Critical identity<br/>Authentication and account recovery"]
+    end
+
+    subgraph REC["Tier 3 — Encrypted Recovery"]
+        T3["Encrypted credential data<br/>Portable recovery tools"]
+    end
+
+    subgraph PHY["Tier 4 — Analog Recovery"]
+        T4A["Primary physical cache"]
+        T4B["Geographically separated<br/>secondary physical cache"]
+    end
+
+    T1 -. critical-account recovery, where configured .-> T2
+    T2 -. access and recovery dependencies .-> T3
+    T4A ---|physical redundancy| T4B
+    T4A -. recovery material, where applicable .-> T2
+    T4B -. alternate physical source .-> T2
+    T4A -. restore or reconstruct data, where supported .-> T3
+    T4B -. restore or reconstruct data, where supported .-> T3
 ```
 
-**Important:** This is a conceptual diagram, not a disclosure of the actual personal configuration. It intentionally omits private obfuscation methods, secret mappings, account names, provider details, and other operationally sensitive information.
+The diagram presents functional domains and illustrative recovery relationships. The solid line indicates physical redundancy between the two physical caches; dashed arrows indicate potential recovery or dependency relationships where supported by the implementation. The arrows are not guarantees that recovery works in both directions or remains available under every failure scenario.
+
+The links are conceptual examples, not a claim that every path exists in every deployment. Remove or relabel any link that does not match the implementation. A connection between two tiers is not, by itself, proof of an independent recovery path.
 
 ## Design principles
 
@@ -144,6 +172,35 @@ These are **design objectives**, not universal guarantees. Some services impose 
 
 A recovery route is only independent to the extent that it does not rely on the same unavailable account, key, device, provider, location, or remembered secret. Mapping these dependencies is an important part of validating the architecture.
 
+## Illustrative recovery test patterns
+
+This section describes **what kinds of failure to simulate**. The examples below are generic test patterns, not the exact procedures, configuration, or results of any particular deployment.
+
+Tests should be performed in a controlled manner, using safe test conditions and avoiding unnecessary exposure of live credentials or recovery secrets.
+
+| Test pattern | Failure condition | Expected result |
+|---|---|---|
+| Primary-source loss | The normal recovery source is treated as unavailable. | A supported alternate source can restore the intended capability without relying on the missing source. |
+| Identity-anchor unavailability | The primary identity or account-recovery control point cannot be used. | Essential recovery remains possible through a previously provisioned alternative, where supported. |
+| Encrypted-data recovery | The normal copy of a protected data set is unavailable or unusable. | An independent copy or recovery source can restore readable, usable data. |
+| Offline-operation test | Network access is unavailable. | Operations designated as offline-capable can be completed without connectivity; network-dependent actions are identified separately. |
+| Physical-cache availability | One physical recovery location is unavailable. | The separated source remains accessible, legible, and usable for its intended purpose. |
+| Recovery-integrity test | A backup or recovery artifact may be incomplete, outdated, or damaged. | Integrity and usability checks identify whether it can still support recovery. |
+| Dependency-isolation test | A component shared by multiple recovery paths is unavailable. | The test identifies which paths remain viable and which fail because of the shared dependency. |
+| Recovery-maintenance test | A component or provider configuration has changed. | Affected recovery paths are rechecked before the updated configuration is relied upon. |
+
+### Recording results without disclosing secrets
+
+For each test, retain a private record containing the scenario, test date, expected outcome, observed outcome, pass/fail status, and any limitations or corrective actions.
+
+Public documentation can report aggregate outcomes or sanitized summaries. It should not include live credentials, secret mappings, recovery sequences, identifying account relationships, or details that would allow an outsider to reconstruct the private configuration.
+
+A successful test demonstrates the tested capability under the conditions exercised; it does not establish that every recovery path will work under every possible failure.
+
+Only mark a capability as tested or validated when the corresponding evidence supports that status.
+
+**Verification note:** The personal implementation has undergone recovery simulations. Detailed procedures, configuration-specific results, and sensitive recovery dependencies are intentionally withheld. Public test descriptions are illustrative and do not constitute a claim that every listed test has been performed.
+
 ## Threat model and limitations
 
 The framework is intended primarily for personal security and resilience against foreseeable events such as account loss, device loss, storage failure, provider outages, and localized physical damage.
@@ -163,6 +220,8 @@ It does not claim to eliminate all risks or to provide certified protection agai
 
 ## Maintenance and recovery testing
 
+This section describes **what to check periodically**, rather than listing individual failure simulations.
+
 A recovery design is only useful if its components remain available and the operator can use them correctly.
 
 Suggested maintenance activities:
@@ -176,6 +235,8 @@ Suggested maintenance activities:
 - **Change review:** Re-test affected recovery paths after changing a component, credential format, encryption implementation, or provider.
 
 ## Implementation status and verification
+
+This section describes **how to label implementation and evidence**. It is separate from the illustrative test catalogue and recurring maintenance checklist.
 
 This repository documents an architecture and its design goals. The exact capabilities and evidence vary by implementation.
 
@@ -222,6 +283,23 @@ Cryptographic components should be replaceable as requirements evolve. Migration
 This repository is an architectural overview, not a deployment guide for a specific person's security setup. It intentionally excludes actual credentials, recovery secrets, private obfuscation mappings, provider-specific account relationships, and other sensitive operational details.
 
 Do not publish real recovery material, secret mappings, or screenshots that expose private account relationships in issues, commits, or documentation.
+
+## Plain-language glossary
+
+* **Compartmentalization:** Keeping routine accounts and critical recovery resources separate so a problem in one area is less likely to spread to others.
+* **Recovery path:** A route for restoring access or capability when the normal method fails.
+* **Independent recovery:** A recovery route that does not rely on the same component or dependency that has failed.
+* **Graceful degradation:** Retaining useful capabilities even when part of the system is unavailable.
+* **Threat model:** A description of the failures, risks, or adversarial situations the design aims to address.
+* **Authenticated encryption:** Encryption that also helps detect unauthorized changes to protected data.
+* **Key derivation:** The process of deriving cryptographic key material from a password or other input.
+* **Recovery drill:** A controlled exercise that checks whether a recovery procedure works as intended.
+
+## License
+
+Unless otherwise stated, the documentation and diagrams in this repository are made available under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license. You may share and adapt those materials, including commercially, subject to the license terms and attribution requirements.
+
+See [`LICENSE`](LICENSE) for a license notice and a link to the official legal text. This notice applies to documentation and diagrams only; any software or code added to the repository should have its licensing scope stated separately. Third-party materials remain subject to their own licenses.
 
 ## Summary
 
