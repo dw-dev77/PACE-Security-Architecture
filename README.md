@@ -1,4 +1,4 @@
-# PACE — Hardened Physical-Digital Security Framework
+# PACE — Physical-Digital Security & Recovery Framework
 
 *A modular personal-security architecture for resilient access, recovery, and graceful degradation.*
 
